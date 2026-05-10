@@ -5,10 +5,10 @@
     "name": "365-py",
     "icon": "https://avatars.githubusercontent.com/u/90153309?v=4"
   },
-  "version": "1.1.8",
+  "version": "1.1.9",
   "type": "anime",
   "language": "English (SUB)",
-  "streamType": "HLS",
+  "streamType": "mp4",
   "quality": "720p",
   "baseUrl": "https://allmanga.to",
   "searchBaseUrl": "https://allmanga.to",

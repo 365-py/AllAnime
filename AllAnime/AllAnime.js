@@ -507,6 +507,19 @@ async function okruExtractor(url) {
         if (!m) return null;
         const json = JSON.parse(m[1].replace(/&quot;/g, '"'));
         const meta = JSON.parse(json.flashvars.metadata);
+
+        // Prefer a direct progressive mp4 URL — AVPlayer starts playing these
+        // almost instantly. HLS via ok.ru's CDN takes 30-60s to buffer the
+        // first segment, which is what made the module feel "stuck loading".
+        if (Array.isArray(meta.videos) && meta.videos.length) {
+            const order = ["full", "fullhd", "hd", "sd", "low", "lowest", "mobile"];
+            for (const q of order) {
+                const v = meta.videos.find(x => x && x.name === q && x.url);
+                if (v) return v.url;
+            }
+            const last = meta.videos[meta.videos.length - 1];
+            if (last && last.url) return last.url;
+        }
         return meta.hlsManifestUrl || meta.ondemandHls || null;
     } catch (e) {
         logErr("okru", e);
