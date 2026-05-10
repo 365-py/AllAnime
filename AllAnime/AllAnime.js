@@ -366,31 +366,28 @@ async function exctractSubOrDubURLs(url, type) {
 
     const sMp4Val     = pick("S-mp4");        // XOR-encoded, points to allanime apivtwo
     const lufMp4Val   = pick("Luf-Mp4");      // XOR-encoded
-    const ytMp4Val    = pick("Yt-mp4");       // XOR-encoded
-    const mp4Val      = pick("Mp4");          // direct mp4upload iframe
+    const ytMp4Val    = pick("Yt-mp4");       // XOR-encoded direct mp4 (tools.fast4speed.rsvp)
     const okVal       = pick("Ok");
     const swVal       = pick("Sw");
     const fileMoonVal = pick("Fm-Hls");
 
     const streams = [];
 
-    // Filemoon
-    try {
-        if (fileMoonVal.length) {
-            const u = await filemoonExtractor(fileMoonVal[0].sourceUrl);
-            if (u) streams.push(`FileMoon ${type}`, u);
-        }
-    } catch (e) { logErr("filemoon", e); }
+    // Order matters: Sora's player picks the first working stream. Put referer-free
+    // HLS / direct mp4 sources first. Mp4Upload is intentionally skipped because it
+    // requires a Referer header that AVPlayer cannot send (causes 403 / -1102).
 
-    // StreamWish
+    // Yt-mp4 — direct mp4 from tools.fast4speed.rsvp, no referer required.
     try {
-        if (swVal.length) {
-            const u = await streamWishExtractor(swVal[0].sourceUrl);
-            if (u) streams.push(`StreamWish ${type}`, u);
+        if (ytMp4Val.length) {
+            const dec = decryptSource(ytMp4Val[0].sourceUrl);
+            if (dec && /^https?:\/\//i.test(dec)) {
+                streams.push(`Yt-mp4 ${type}`, dec);
+            }
         }
-    } catch (e) { logErr("streamwish", e); }
+    } catch (e) { logErr("yt-mp4", e); }
 
-    // OK.ru
+    // OK.ru — HLS, plays directly.
     try {
         if (okVal.length) {
             const u = await okruExtractor(okVal[0].sourceUrl);
@@ -398,19 +395,10 @@ async function exctractSubOrDubURLs(url, type) {
         }
     } catch (e) { logErr("okru", e); }
 
-    // mp4upload
-    try {
-        if (mp4Val.length) {
-            const u = await mp4Extractor(mp4Val[0].sourceUrl);
-            if (u) streams.push(`Mp4Upload ${type}`, u);
-        }
-    } catch (e) { logErr("mp4", e); }
-
-    // S-mp4 / Luf-Mp4 / Yt-mp4 — XOR-encoded paths to allanime's clock endpoint.
+    // S-mp4 / Luf-Mp4 — allanime's clock endpoint, returns m3u8.
     const xorSources = [
         { label: "S-mp4",   list: sMp4Val   },
-        { label: "Luf-Mp4", list: lufMp4Val },
-        { label: "Yt-mp4",  list: ytMp4Val  }
+        { label: "Luf-Mp4", list: lufMp4Val }
     ];
     for (const src of xorSources) {
         try {
@@ -423,6 +411,22 @@ async function exctractSubOrDubURLs(url, type) {
             }
         } catch (e) { logErr(src.label, e); }
     }
+
+    // FileMoon — HLS but the page is heavily packed; often fails. Try last.
+    try {
+        if (fileMoonVal.length) {
+            const u = await filemoonExtractor(fileMoonVal[0].sourceUrl);
+            if (u) streams.push(`FileMoon ${type}`, u);
+        }
+    } catch (e) { logErr("filemoon", e); }
+
+    // StreamWish — same packer issue, try last.
+    try {
+        if (swVal.length) {
+            const u = await streamWishExtractor(swVal[0].sourceUrl);
+            if (u) streams.push(`StreamWish ${type}`, u);
+        }
+    } catch (e) { logErr("streamwish", e); }
 
     return streams;
 }
