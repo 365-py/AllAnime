@@ -374,20 +374,11 @@ async function exctractSubOrDubURLs(url, type) {
     const streams = [];
 
     // Order matters: Sora's player picks the first working stream. Put referer-free
-    // HLS / direct mp4 sources first. Mp4Upload is intentionally skipped because it
-    // requires a Referer header that AVPlayer cannot send (causes 403 / -1102).
+    // HLS sources first. Mp4Upload is intentionally skipped because it requires a
+    // Referer header that AVPlayer cannot send (causes 403 / -1102). Yt-mp4 is
+    // skipped because its mp4 container/codec isn't accepted by AVPlayer (-11828).
 
-    // Yt-mp4 — direct mp4 from tools.fast4speed.rsvp, no referer required.
-    try {
-        if (ytMp4Val.length) {
-            const dec = decryptSource(ytMp4Val[0].sourceUrl);
-            if (dec && /^https?:\/\//i.test(dec)) {
-                streams.push(`Yt-mp4 ${type}`, dec);
-            }
-        }
-    } catch (e) { logErr("yt-mp4", e); }
-
-    // OK.ru — HLS, plays directly.
+    // OK.ru — HLS, plays directly. This is the most reliable source.
     try {
         if (okVal.length) {
             const u = await okruExtractor(okVal[0].sourceUrl);
