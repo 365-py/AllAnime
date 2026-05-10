@@ -508,21 +508,12 @@ async function okruExtractor(url) {
         const json = JSON.parse(m[1].replace(/&quot;/g, '"'));
         const meta = JSON.parse(json.flashvars.metadata);
 
-        // Prefer a direct progressive mp4 — AVPlayer starts these almost
-        // instantly vs 30-60s HLS buffering. Return {url, quality} so the
-        // stream label can show the actual quality in Sora's picker.
-        const qMap = { full: "1080p", fullhd: "1080p", hd: "720p", sd: "480p", low: "360p", lowest: "240p", mobile: "144p" };
-        if (Array.isArray(meta.videos) && meta.videos.length) {
-            const order = ["full", "fullhd", "hd", "sd", "low", "lowest", "mobile"];
-            for (const q of order) {
-                const v = meta.videos.find(x => x && x.name === q && x.url);
-                if (v) return { url: v.url, quality: qMap[q] || q };
-            }
-            const last = meta.videos[meta.videos.length - 1];
-            if (last && last.url) return { url: last.url, quality: last.name || "unknown" };
-        }
+        // ok.ru's `videos` array contains redirector URLs (vkuser.net/?id=...)
+        // that AVPlayer cannot follow — it gets -1008 "resource unavailable".
+        // The HLS manifest works fine; it just takes ~30-60s to start because
+        // AVPlayer prefetches the highest variant. That's the trade-off.
         const hlsUrl = meta.hlsManifestUrl || meta.ondemandHls || null;
-        return hlsUrl ? { url: hlsUrl, quality: "HLS" } : null;
+        return hlsUrl ? { url: hlsUrl, quality: "1080p" } : null;
     } catch (e) {
         logErr("okru", e);
         return null;
