@@ -364,60 +364,24 @@ async function exctractSubOrDubURLs(url, type) {
 
     const pick = name => sources.filter(x => x && x.sourceName === name);
 
-    const sMp4Val     = pick("S-mp4");        // XOR-encoded, points to allanime apivtwo
-    const lufMp4Val   = pick("Luf-Mp4");      // XOR-encoded
-    const ytMp4Val    = pick("Yt-mp4");       // XOR-encoded direct mp4 (tools.fast4speed.rsvp)
-    const okVal       = pick("Ok");
-    const swVal       = pick("Sw");
-    const fileMoonVal = pick("Fm-Hls");
+    const okVal = pick("Ok");
 
     const streams = [];
 
-    // Order matters: Sora's player picks the first working stream. Put referer-free
-    // HLS sources first. Mp4Upload is intentionally skipped because it requires a
-    // Referer header that AVPlayer cannot send (causes 403 / -1102). Yt-mp4 is
-    // skipped because its mp4 container/codec isn't accepted by AVPlayer (-11828).
+    // Sora's player picks the first stream, so we only return sources that we
+    // know AVPlayer can actually play. Everything else AllAnime offers is
+    // either captcha-gated, referer-locked (Mp4Upload -> 403), wrapped in a
+    // packer we can't unpack (FileMoon, StreamWish), or funnels to the
+    // tools.fast4speed.rsvp mp4 that AVPlayer rejects with "format not
+    // supported" / -11828 (Yt-mp4, and S-mp4 / Luf-Mp4 via clock.json).
+    // OK.ru is the only one that consistently plays in AVPlayer.
 
-    // OK.ru — HLS, plays directly. This is the most reliable source.
     try {
         if (okVal.length) {
             const u = await okruExtractor(okVal[0].sourceUrl);
             if (u) streams.push(`Okru ${type}`, u);
         }
     } catch (e) { logErr("okru", e); }
-
-    // S-mp4 / Luf-Mp4 — allanime's clock endpoint, returns m3u8.
-    const xorSources = [
-        { label: "S-mp4",   list: sMp4Val   },
-        { label: "Luf-Mp4", list: lufMp4Val }
-    ];
-    for (const src of xorSources) {
-        try {
-            if (src.list.length) {
-                const dec = decryptSource(src.list[0].sourceUrl);
-                if (dec) {
-                    const u = await defaultExtractor(dec.replace("/clock?", "/clock.json?"));
-                    if (u) streams.push(`${src.label} ${type}`, u);
-                }
-            }
-        } catch (e) { logErr(src.label, e); }
-    }
-
-    // FileMoon — HLS but the page is heavily packed; often fails. Try last.
-    try {
-        if (fileMoonVal.length) {
-            const u = await filemoonExtractor(fileMoonVal[0].sourceUrl);
-            if (u) streams.push(`FileMoon ${type}`, u);
-        }
-    } catch (e) { logErr("filemoon", e); }
-
-    // StreamWish — same packer issue, try last.
-    try {
-        if (swVal.length) {
-            const u = await streamWishExtractor(swVal[0].sourceUrl);
-            if (u) streams.push(`StreamWish ${type}`, u);
-        }
-    } catch (e) { logErr("streamwish", e); }
 
     return streams;
 }
