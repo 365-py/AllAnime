@@ -1,10 +1,15 @@
 {
   "sourceName": "AllAnime",
-  "author": "Churly (patched)",
-  "version": "1.1.0",
-  "language": "en",
+  "iconUrl": "https://api.lanyard.rest/1324250018571358228.png",
+  "author": {
+    "name": "365-py",
+    "icon": "https://i.pinimg.com/236x/90/2c/ea/902ceaa5610ef7f8f81c2f3881799f2c.jpg"
+  },
+  "version": "1.1.1",
   "type": "anime",
-  "iconUrl": "https://allmanga.to/favicon.ico",
+  "language": "English (SUB)",
+  "streamType": "HLS",
+  "quality": "720p",
   "baseUrl": "https://allmanga.to",
   "searchBaseUrl": "https://allmanga.to",
   "scriptUrl": "https://raw.githubusercontent.com/365-py/AllAnime/main/AllAnime/AllAnime.js",
