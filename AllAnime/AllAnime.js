@@ -113,6 +113,14 @@ function pickTitle(obj) {
     return obj.englishName || obj.name || obj.nativeName || "Unknown";
 }
 
+// AllAnime returns relative thumbnail paths like "mcovers/a_tbs/dhw/xxx.webp".
+// Prepend the image CDN so Sora can load them.
+function fixImage(url) {
+    if (!url) return "https://allmanga.to/favicon.ico";
+    if (/^https?:\/\//i.test(url)) return url;
+    return "https://wp.youtube-anime.com/aln.youtube-anime.com/" + url.replace(/^\/+/, "");
+}
+
 /* ------------------------------------------------------------------ */
 /*  SEARCH                                                            */
 /* ------------------------------------------------------------------ */
@@ -135,7 +143,7 @@ async function searchResults(keyword) {
 
         const results = edges.map(a => ({
             title: pickTitle(a),
-            image: a && a.thumbnail ? a.thumbnail : "",
+            image: fixImage(a && a.thumbnail),
             href:  a && a._id ? a._id : ""
         })).filter(r => r.href);
 
