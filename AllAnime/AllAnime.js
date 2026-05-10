@@ -654,26 +654,23 @@ function _filterargs(source) {
 /*  BASE64 + AES-256-CTR (pure JS, used for AllAnime "tobeparsed")    */
 /* ------------------------------------------------------------------ */
 function b64ToBytes(b64) {
-    if (typeof atob === "function") {
-        const s = atob(b64);
-        const out = new Uint8Array(s.length);
-        for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
-        return out;
-    }
+    b64 = String(b64).replace(/[^A-Za-z0-9+/=]/g, "");
     const tbl = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    b64 = b64.replace(/[^A-Za-z0-9+/=]/g, "");
-    const len = (b64.length * 3) >> 2;
-    const out = new Uint8Array(len - (b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0));
+    let pad = 0;
+    if (b64.length >= 2 && b64.charAt(b64.length - 1) === "=") pad++;
+    if (b64.length >= 2 && b64.charAt(b64.length - 2) === "=") pad++;
+    const outLen = ((b64.length / 4) | 0) * 3 - pad;
+    const out = new Uint8Array(outLen);
     let p = 0;
     for (let i = 0; i < b64.length; i += 4) {
-        const a = tbl.indexOf(b64[i]);
-        const b = tbl.indexOf(b64[i+1]);
-        const c = tbl.indexOf(b64[i+2]);
-        const d = tbl.indexOf(b64[i+3]);
-        const n = (a << 18) | (b << 12) | ((c & 63) << 6) | (d & 63);
-        if (p < out.length) out[p++] = (n >> 16) & 0xff;
-        if (p < out.length) out[p++] = (n >> 8) & 0xff;
-        if (p < out.length) out[p++] = n & 0xff;
+        const a = tbl.indexOf(b64.charAt(i));
+        const b = tbl.indexOf(b64.charAt(i + 1));
+        const c = tbl.indexOf(b64.charAt(i + 2));
+        const d = tbl.indexOf(b64.charAt(i + 3));
+        const n = ((a & 63) << 18) | ((b & 63) << 12) | ((c & 63) << 6) | (d & 63);
+        if (p < outLen) out[p++] = (n >> 16) & 0xff;
+        if (p < outLen) out[p++] = (n >> 8) & 0xff;
+        if (p < outLen) out[p++] = n & 0xff;
     }
     return out;
 }
