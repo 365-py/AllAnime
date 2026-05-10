@@ -129,14 +129,26 @@ async function fetchEpisodeSources(variables, tag) {
         "Origin":     "https://youtu-chan.com"
     };
 
-    const res  = await fetchv2(url, headers, "GET");
-    if (!res) throw new Error("Empty response from episode endpoint");
-    const data = await safeJson(res, tag);
+    logDbg(tag, "GET " + url.slice(0, 120) + "...");
+    let res;
+    try {
+        res = await fetchv2(url, headers);
+    } catch (e) {
+        logErr(tag + "-fetch", e);
+        return [];
+    }
+    if (!res) { logErr(tag, "null response"); return []; }
+
+    let data;
+    try { data = await safeJson(res, tag); }
+    catch (e) { return []; }
 
     if (data && data.data && data.data.tobeparsed) {
         try {
             const plain = aesCtrDecryptBlob(data.data.tobeparsed, ANIME_AES_KEY);
-            return parseTobeparsed(plain);
+            const parsed = parseTobeparsed(plain);
+            logDbg(tag, "got " + parsed.length + " sources");
+            return parsed;
         } catch (e) {
             logErr(tag + "-decrypt", e);
             return [];
@@ -144,6 +156,8 @@ async function fetchEpisodeSources(variables, tag) {
     }
     if (data && data.errors) {
         logErr(tag, "GraphQL errors: " + JSON.stringify(data.errors).slice(0, 300));
+    } else {
+        logErr(tag, "no tobeparsed in response: " + JSON.stringify(data || {}).slice(0, 300));
     }
     return [];
 }
