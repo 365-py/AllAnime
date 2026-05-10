@@ -1,0 +1,14 @@
+{
+  "sourceName": "AllAnime",
+  "author": "Churly (patched)",
+  "version": "1.1.0",
+  "language": "en",
+  "type": "anime",
+  "iconUrl": "https://allmanga.to/favicon.ico",
+  "baseUrl": "https://allmanga.to",
+  "searchBaseUrl": "https://allmanga.to",
+  "scriptUrl": "https://raw.githubusercontent.com/365-py/AllAnime/main/AllAnime/AllAnime.js",
+  "asyncJS": true,
+  "streamAsyncJS": true,
+  "softsub": false
+}
