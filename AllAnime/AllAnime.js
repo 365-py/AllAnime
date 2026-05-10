@@ -508,12 +508,56 @@ async function okruExtractor(url) {
         const json = JSON.parse(m[1].replace(/&quot;/g, '"'));
         const meta = JSON.parse(json.flashvars.metadata);
 
-        // ok.ru's `videos` array contains redirector URLs (vkuser.net/?id=...)
-        // that AVPlayer cannot follow — it gets -1008 "resource unavailable".
-        // The HLS manifest works fine; it just takes ~30-60s to start because
-        // AVPlayer prefetches the highest variant. That's the trade-off.
-        const hlsUrl = meta.hlsManifestUrl || meta.ondemandHls || null;
-        return hlsUrl ? { url: hlsUrl, quality: "1080p" } : null;
+        // ok.ru's `videos` array points at vkuser.net redirector URLs that
+        // AVPlayer can't open directly (-1008). HLS master works but is slow:
+        // AVPlayer fetches master -> picks 1080p -> fetches variant -> fetches
+        // segments. To cut startup latency and stop mid-stream buffering, we
+        // pre-fetch the master ourselves, pick a 720p variant, and return that
+        // variant playlist URL directly. One fewer round trip and a bitrate
+        // that actually streams smoothly.
+        const masterUrl = meta.hlsManifestUrl || meta.ondemandHls;
+        if (!masterUrl) return null;
+
+        try {
+            const mres = await fetchv2(masterUrl, {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+                "Referer": "https://ok.ru/"
+            });
+            const master = await mres.text();
+            // Parse `#EXT-X-STREAM-INF:RESOLUTION=WxH...` followed by the URL line.
+            const lines = master.split(/\r?\n/);
+            const variants = [];
+            for (let i = 0; i < lines.length; i++) {
+                const ln = lines[i];
+                if (!ln.startsWith("#EXT-X-STREAM-INF")) continue;
+                const resMatch = ln.match(/RESOLUTION=\d+x(\d+)/);
+                const bwMatch  = ln.match(/BANDWIDTH=(\d+)/);
+                let urlLine = "";
+                for (let j = i + 1; j < lines.length; j++) {
+                    if (lines[j] && !lines[j].startsWith("#")) { urlLine = lines[j].trim(); break; }
+                }
+                if (!urlLine) continue;
+                if (urlLine.indexOf("://") === -1) {
+                    const base = masterUrl.substring(0, masterUrl.lastIndexOf("/") + 1);
+                    urlLine = base + urlLine;
+                }
+                variants.push({
+                    height: resMatch ? parseInt(resMatch[1]) : 0,
+                    bandwidth: bwMatch ? parseInt(bwMatch[1]) : 0,
+                    url: urlLine
+                });
+            }
+            if (variants.length) {
+                // Prefer 720p; otherwise the highest variant <= 720p; else lowest.
+                variants.sort((a, b) => a.height - b.height);
+                let chosen = variants.find(v => v.height === 720)
+                          || [...variants].reverse().find(v => v.height && v.height <= 720)
+                          || variants[0];
+                return { url: chosen.url, quality: chosen.height ? `${chosen.height}p` : "auto" };
+            }
+        } catch (_) { /* fall through to master playlist */ }
+
+        return { url: masterUrl, quality: "auto" };
     } catch (e) {
         logErr("okru", e);
         return null;
