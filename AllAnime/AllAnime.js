@@ -378,8 +378,8 @@ async function exctractSubOrDubURLs(url, type) {
 
     try {
         if (okVal.length) {
-            const u = await okruExtractor(okVal[0].sourceUrl);
-            if (u) streams.push(`Okru ${type}`, u);
+            const result = await okruExtractor(okVal[0].sourceUrl);
+            if (result && result.url) streams.push(`Okru ${result.quality} ${type}`, result.url);
         }
     } catch (e) { logErr("okru", e); }
 
@@ -508,19 +508,21 @@ async function okruExtractor(url) {
         const json = JSON.parse(m[1].replace(/&quot;/g, '"'));
         const meta = JSON.parse(json.flashvars.metadata);
 
-        // Prefer a direct progressive mp4 URL — AVPlayer starts playing these
-        // almost instantly. HLS via ok.ru's CDN takes 30-60s to buffer the
-        // first segment, which is what made the module feel "stuck loading".
+        // Prefer a direct progressive mp4 — AVPlayer starts these almost
+        // instantly vs 30-60s HLS buffering. Return {url, quality} so the
+        // stream label can show the actual quality in Sora's picker.
+        const qMap = { full: "1080p", fullhd: "1080p", hd: "720p", sd: "480p", low: "360p", lowest: "240p", mobile: "144p" };
         if (Array.isArray(meta.videos) && meta.videos.length) {
             const order = ["full", "fullhd", "hd", "sd", "low", "lowest", "mobile"];
             for (const q of order) {
                 const v = meta.videos.find(x => x && x.name === q && x.url);
-                if (v) return v.url;
+                if (v) return { url: v.url, quality: qMap[q] || q };
             }
             const last = meta.videos[meta.videos.length - 1];
-            if (last && last.url) return last.url;
+            if (last && last.url) return { url: last.url, quality: last.name || "unknown" };
         }
-        return meta.hlsManifestUrl || meta.ondemandHls || null;
+        const hlsUrl = meta.hlsManifestUrl || meta.ondemandHls || null;
+        return hlsUrl ? { url: hlsUrl, quality: "HLS" } : null;
     } catch (e) {
         logErr("okru", e);
         return null;

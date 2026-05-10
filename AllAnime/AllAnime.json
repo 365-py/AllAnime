@@ -5,11 +5,11 @@
     "name": "365-py",
     "icon": "https://avatars.githubusercontent.com/u/90153309?v=4"
   },
-  "version": "1.1.9",
+  "version": "1.2.0",
   "type": "anime",
   "language": "English (SUB)",
   "streamType": "mp4",
-  "quality": "720p",
+  "quality": "1080p",
   "baseUrl": "https://allmanga.to",
   "searchBaseUrl": "https://allmanga.to",
   "scriptUrl": "https://raw.githubusercontent.com/365-py/AllAnime/main/AllAnime/AllAnime.js",
