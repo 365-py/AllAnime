@@ -25,14 +25,16 @@ const SEARCH_QUERY = `
 query(
   $search: SearchInput,
   $limit: Int,
-  $countryOrigin: VaildCountryOriginEnumType,
-  $page: Int
+  $page: Int,
+  $translationType: VaildTranslationTypeEnumType,
+  $countryOrigin: VaildCountryOriginEnumType
 ) {
   shows(
     search: $search,
     limit: $limit,
-    countryOrigin: $countryOrigin,
-    page: $page
+    page: $page,
+    translationType: $translationType,
+    countryOrigin: $countryOrigin
   ) {
     edges {
       _id
@@ -41,6 +43,8 @@ query(
       englishName
       thumbnail
       slugTime
+      availableEpisodes
+      __typename
     }
   }
 }`;
@@ -204,27 +208,45 @@ function fixImage(url) {
 /* ------------------------------------------------------------------ */
 async function searchResults(keyword) {
     try {
-        const variables = {
-            search: { query: keyword, allowAdult: false, allowUnknown: false },
-            countryOrigin: "ALL",
-            limit: 26,
-            page: 1
+        // AllAnime now requires translationType in the search variables.
+        // Try "sub" first (most coverage), then fall back to "dub".
+        const baseVars = {
+            search: { allowAdult: false, allowUnknown: false, query: keyword },
+            limit: 40,
+            page: 1,
+            countryOrigin: "ALL"
         };
 
-        const data = await gql(SEARCH_QUERY, variables, "search");
-        const edges = (data && data.data && data.data.shows && data.data.shows.edges) || [];
+        let edges = [];
+        for (const tt of ["sub", "dub"]) {
+            const variables = Object.assign({}, baseVars, { translationType: tt });
+            const data = await gql(SEARCH_QUERY, variables, "search-" + tt);
+            edges = (data && data.data && data.data.shows && data.data.shows.edges) || [];
+            if (edges.length) break;
+            if (data && data.errors) {
+                logErr("search-" + tt, "GraphQL errors: " + JSON.stringify(data.errors).slice(0, 300));
+            }
+        }
 
         if (!edges.length) {
             logDbg("search", "No results for '" + keyword + "'");
             return JSON.stringify([]);
         }
 
-        const results = edges.map(a => ({
-            title: pickTitle(a),
-            image: fixImage(a && a.thumbnail),
-            href:  a && a._id ? a._id : ""
-        })).filter(r => r.href);
+        // De-dupe by _id (rare but safe).
+        const seen = {};
+        const results = [];
+        for (const a of edges) {
+            if (!a || !a._id || seen[a._id]) continue;
+            seen[a._id] = 1;
+            results.push({
+                title: pickTitle(a),
+                image: fixImage(a && a.thumbnail),
+                href:  a._id
+            });
+        }
 
+        logDbg("search", results.length + " results for '" + keyword + "'");
         return JSON.stringify(results);
     } catch (error) {
         logErr("search", error);
@@ -379,7 +401,7 @@ async function exctractSubOrDubURLs(url, type) {
     try {
         if (okVal.length) {
             const result = await okruExtractor(okVal[0].sourceUrl);
-            if (result && result.url) streams.push(`Okru ${result.quality} ${type}`, result.url);
+            if (result && result.url) streams.push(`Okru ${type}`, result.url);
         }
     } catch (e) { logErr("okru", e); }
 
